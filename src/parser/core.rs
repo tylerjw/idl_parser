@@ -1054,7 +1054,7 @@ fn parse_template_type_spec(input: Span) -> PResult<TemplateTypeSpec> {
         let (input, s) = alt((tag("string"), tag("wstring")))(input)?;
         match s.as_str() {
             "string" => return Ok((input, TemplateTypeSpec::String(StringType::UnlimitedSize))),
-            "wtring" => return Ok((input, TemplateTypeSpec::WString(WStringType::UnlimitedSize))),
+            "wstring" => return Ok((input, TemplateTypeSpec::WString(WStringType::UnlimitedSize))),
             _ => unreachable!(),
         }
     }
@@ -1579,6 +1579,22 @@ mod tests {
     use crate::expr::*;
     use num_bigint::BigInt;
     use num_traits::FromPrimitive;
+
+    #[test]
+    fn wide_string_template_types() {
+        assert_eq!(
+            parse_template_type_spec(Span::new("wstring ")).unwrap().1,
+            TemplateTypeSpec::WString(WStringType::UnlimitedSize)
+        );
+        assert_eq!(
+            parse_template_type_spec(Span::new("wstring<16>"))
+                .unwrap()
+                .1,
+            TemplateTypeSpec::WString(WStringType::Sized(ConstExpr::Literal(Literal::Integer(
+                BigInt::from_u8(16).unwrap()
+            ))))
+        );
+    }
 
     #[test]
     fn expr() {
