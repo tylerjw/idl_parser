@@ -654,13 +654,16 @@ fn parse_num(input: Span) -> PResult<Literal> {
                 Ok((input, result))
             }
             "e" | "E" => {
-                let (input, exp_sign) = tag::<&str, Span, VerboseError<Span>>("-")(input)
-                    .unwrap_or((input, Span::new("")));
+                let (input, exp_sign) = alt((
+                    tag::<&str, Span, VerboseError<Span>>("-"),
+                    tag::<&str, Span, VerboseError<Span>>("+"),
+                ))(input)
+                .unwrap_or((input, Span::new("")));
                 let sign = if sign { "-" } else { "" };
 
-                let (input, float_num) = if exp_sign.as_str() == "-" {
+                let (input, float_num) = if !exp_sign.is_empty() {
                     let (input, exp) = parse_decimal(input)?;
-                    (input, format!("{sign}{integer}.{fraction}e-{exp}"))
+                    (input, format!("{sign}{integer}.{fraction}e{exp_sign}{exp}"))
                 } else if let Ok((input, exp)) = parse_decimal(input) {
                     (input, format!("{sign}{integer}.{fraction}e{exp}"))
                 } else {
@@ -1594,6 +1597,38 @@ mod tests {
                 BigInt::from_u8(16).unwrap()
             ))))
         );
+    }
+
+    #[test]
+    fn floating_point_exponents_with_explicit_signs() {
+        let (remaining, positive) = parse_const_expr(Span::new("1.7976931348623157e+308"), false)
+            .expect("positive exponent");
+        assert!(remaining.is_empty());
+        assert_eq!(
+            positive,
+            ConstExpr::Literal(Literal::FloatingPoint(1.7976931348623157e308))
+        );
+
+        let (remaining, negative_value) =
+            parse_const_expr(Span::new("-1.7976931348623157e+308"), false).expect("negative value");
+        assert!(remaining.is_empty());
+        assert_eq!(
+            negative_value,
+            ConstExpr::UnaryOp(UnaryOpExpr::Minus(Box::new(ConstExpr::Literal(
+                Literal::FloatingPoint(1.7976931348623157e308)
+            ))))
+        );
+
+        let (remaining, negative_exponent) =
+            parse_const_expr(Span::new("1.5e-4"), false).expect("negative exponent");
+        assert!(remaining.is_empty());
+        assert_eq!(
+            negative_exponent,
+            ConstExpr::Literal(Literal::FloatingPoint(1.5e-4))
+        );
+
+        assert!(parse_const_expr(Span::new("1.0e+"), false).is_err());
+        assert!(parse_const_expr(Span::new("1.0e-"), false).is_err());
     }
 
     #[test]
